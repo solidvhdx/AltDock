@@ -54,8 +54,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.v.outputs.version }}
         run: |
-          mkdir dist && cp "dist-installer/AltDock-Setup-$VERSION.exe" dist/
-          cd dist
+          mkdir test-release && cp "dist-installer/AltDock-Setup-$VERSION.exe" test-release/
+          cd test-release
           sha256sum -- * > SHA256SUMS.txt
           short=${GITHUB_SHA::7}
           cat > ../notes.md <<EOF
