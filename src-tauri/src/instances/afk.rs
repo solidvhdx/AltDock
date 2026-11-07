@@ -256,13 +256,14 @@ fn tick(app: &AppHandle) -> Duration {
     if !v.anti_afk.enabled {
         return TICK;
     }
-    let busy = s.macros.busy();
+    // Clients running a macro too: a macro that sends to a window in the background (ControlSend)
+    // doesn't count for Roblox, which got them kicked for idling.
     // A hung client would block this one thread, and the others would get kicked for idling.
     let clients: Vec<(AfkClient, AfkClientConfig)> = s
         .tracker
         .afk_clients()
         .into_iter()
-        .filter(|c| !busy.contains(&c.id) && !process::hung(c.pid))
+        .filter(|c| !process::hung(c.pid))
         .map(|c| {
             let cfg = config_with(&s, &v, c.account_id);
             (c, cfg)

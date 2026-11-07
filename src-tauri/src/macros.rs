@@ -120,7 +120,7 @@ impl Runner {
         out
     }
 
-    /// Instance ids of the clients running a macro (anti-AFK leaves them alone).
+    /// Instance ids of the clients running a macro.
     pub fn busy(&self) -> Vec<String> {
         self.runs().keys().cloned().collect()
     }
