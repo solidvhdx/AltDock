@@ -65,27 +65,6 @@ pub fn is_loopback(family: u32, address: &[u8; 20]) -> bool {
     }
 }
 
-#[cfg(test)]
-mod loopback_tests {
-    use super::is_loopback;
-
-    #[test]
-    fn only_this_pc_is_loopback() {
-        let v4 = |a: [u8; 4]| {
-            let mut x = [0u8; 20];
-            x[2..6].copy_from_slice(&a);
-            x
-        };
-        assert!(is_loopback(2, &v4([127, 0, 0, 2])));
-        assert!(!is_loopback(2, &v4([192, 168, 0, 228])));
-        let mut one = [0u8; 20];
-        one[15] = 1;
-        assert!(is_loopback(23, &one));
-        assert!(!is_loopback(23, &[0u8; 20]));
-        assert!(!is_loopback(0, &[0u8; 20]));
-    }
-}
-
 /// Remote Desktop's port.
 const PORT: &str = "3389";
 /// Every address but loopback (127.0.0.0/8, ::1); `::` is never a sender.
@@ -201,5 +180,26 @@ pub fn remove() -> std::result::Result<String, String> {
         Ok(true) => Ok(FIREWALL_RULE.to_owned()),
         Ok(false) => Ok(String::new()),
         Err(e) => Err(e.message()),
+    }
+}
+
+#[cfg(test)]
+mod loopback_tests {
+    use super::is_loopback;
+
+    #[test]
+    fn only_this_pc_is_loopback() {
+        let v4 = |a: [u8; 4]| {
+            let mut x = [0u8; 20];
+            x[2..6].copy_from_slice(&a);
+            x
+        };
+        assert!(is_loopback(2, &v4([127, 0, 0, 2])));
+        assert!(!is_loopback(2, &v4([192, 168, 0, 228])));
+        let mut one = [0u8; 20];
+        one[15] = 1;
+        assert!(is_loopback(23, &one));
+        assert!(!is_loopback(23, &[0u8; 20]));
+        assert!(!is_loopback(0, &[0u8; 20]));
     }
 }

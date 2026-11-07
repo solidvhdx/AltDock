@@ -46,8 +46,12 @@ const BETWEEN: Duration = Duration::from_millis(100);
 const RESTORED: Duration = Duration::from_millis(300);
 /// A client's own interval, in seconds: at least a minute, under Roblox's 20 idle minutes.
 pub const INTERVAL_SEC: std::ops::RangeInclusive<u32> = 60..=1140;
-/// How long a key is held, and the pause after it is let go.
-const HOLD_MS: u64 = 40;
+/// How long a key is held, and the pause after it is let go: a few of Roblox's frames, so the
+/// game sees the key down at all.
+const HOLD_MS: u64 = 120;
+/// A client's time to notice it has the focus before keys go in: Roblox drops keys that arrive
+/// before its game loop has seen the focus change, and 40 ms after the switch was too early.
+const SETTLE: Duration = Duration::from_millis(250);
 /// How long `JumpTurn` holds the Left arrow.
 const TURN_MS: u64 = 600;
 
@@ -268,7 +272,10 @@ fn tick(app: &AppHandle) -> Duration {
     let planned: Vec<Planned> = clients.iter().map(|(c, cfg)| Planned { id: c.id.clone(), since: c.since, interval_sec: cfg.interval_sec }).collect();
     let ids = match plan(&planned, now_ms(), idle_ms()) {
         Plan::Wait => return TICK,
-        Plan::Retry => return RETRY,
+        Plan::Retry => {
+            log::info!("anti-AFK: clients are due, waiting for 5 s without keyboard or mouse input");
+            return RETRY;
+        }
         Plan::Press(ids) => ids,
     };
     let mut failed = false;
@@ -354,11 +361,15 @@ fn press(hwnd: HWND, keys: &[Step]) -> Pressed {
     // SAFETY: reads which window is in front.
     let in_front = || unsafe { GetForegroundWindow() } == hwnd;
     let mut sent = false;
-    // Input other than ours while keys go in: the user is back.
-    let mut user = false;
     let mut held: Vec<Key> = Vec::new();
+    let before = last_input();
+    sleep(SETTLE);
     let mut ours = last_input();
-    for step in keys {
+    // Input other than ours while the client settled or keys go in: the user is back. Input
+    // while it settled: no key goes in at all.
+    let mut user = ours != before;
+    let steps = if user { &[][..] } else { keys };
+    for step in steps {
         match *step {
             Step::Down(k) => {
                 // Never into another window: only while the client is still the one in front.
