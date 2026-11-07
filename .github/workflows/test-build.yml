@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: test-build
@@ -27,8 +27,6 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 45
-    outputs:
-      version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - id: v
@@ -47,29 +45,17 @@ jobs:
       - name: Inno Setup 6.6+
         run: choco upgrade innosetup --no-progress -y
       - run: powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
-      - uses: actions/upload-artifact@v7
-        with:
-          name: test-build
-          path: dist-installer/AltDock-Setup-${{ steps.v.outputs.version }}.exe
-          if-no-files-found: error
-
-  draft:
-    needs: windows
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: test-build
-          path: dist
+      # Straight from this job: handing the installer to a second job through artifacts failed
+      # with "digest-mismatch".
       - name: Replace the "AltDock test build" draft
-        working-directory: dist
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          VERSION: ${{ needs.windows.outputs.version }}
+          VERSION: ${{ steps.v.outputs.version }}
         run: |
+          mkdir dist && cp "dist-installer/AltDock-Setup-$VERSION.exe" dist/
+          cd dist
           sha256sum -- * > SHA256SUMS.txt
           short=${GITHUB_SHA::7}
           cat > ../notes.md <<EOF
@@ -79,5 +65,5 @@ jobs:
           $(cat SHA256SUMS.txt)
           ~~~
           EOF
-          gh release delete test-build --yes 2>/dev/null || true
+          gh release delete test-build --yes --cleanup-tag 2>/dev/null || true
           gh release create test-build ./* --draft --prerelease --target "$GITHUB_SHA" --title "AltDock test build ($short)" --notes-file ../notes.md
